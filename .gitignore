@@ -1,0 +1,22 @@
+# Ignorar todo lo que no sea codigo fuente ni shaders
+*.exe
+*.dll
+*.obj
+*.pdb
+*.ilk
+*.lib
+*.exp
+*.user
+*.suo
+*.bak
+
+# Carpetas pesadas o locales
+Models/
+Textures/
+x64/
+.vs/
+Debug/
+Release/
+include/
+lib/
+glm/
