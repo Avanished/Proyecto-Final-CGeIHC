@@ -211,6 +211,44 @@ glm::mat4 ApplyTRS(glm::mat4 base, glm::vec3 t, glm::vec3 r, glm::vec3 s)
     return base;
 }
 
+glm::vec3 SafeNormalize(const glm::vec3& v)
+{
+    float len = glm::length(v);
+    if (len <= 0.0001f) return glm::vec3(0.0f, 0.0f, 0.0f);
+    return v / len;
+}
+
+void UpdatePathFollower(
+    glm::vec3& pos,
+    float& rotY,
+    int& currentIndex,
+    const std::vector<glm::vec3>& path,
+    float speed,
+    float dt,
+    float threshold = 0.60f)
+{
+    if (path.empty()) return;
+
+    glm::vec3 target = path[currentIndex];
+    glm::vec3 delta = target - pos;
+    float dist = glm::length(delta);
+
+    if (dist < threshold) {
+        currentIndex = (currentIndex + 1) % path.size();
+        target = path[currentIndex];
+        delta = target - pos;
+        dist = glm::length(delta);
+    }
+
+    if (dist > 0.0001f) {
+        glm::vec3 dir = delta / dist;
+        float step = speed * dt;
+        if (step > dist) step = dist;
+        pos += dir * step;
+
+        rotY = atan2(dir.x, dir.z) / toRadians;
+    }
+}
 // ======================================================
 // HELPER: mueve una posicion hacia el origen en X y Z
 // ======================================================
@@ -270,7 +308,7 @@ int main()
     camera = Camera(
         glm::vec3(0.0f, 0.0f, 0.0f),
         glm::vec3(0.0f, 1.0f, 0.0f),
-        -60.0f, 0.0f, 0.5f, 0.5f
+        -60.0f, 0.0f, 20.0f, 0.3f
     );
 
     // ------------------------------------------------
@@ -567,8 +605,9 @@ int main()
     LlantaAI_Crash_M = Model(); LlantaAI_Crash_M.LoadModel("Models/ruedaSteamCar1CrashGrunt.obj");
     printf("OK -> LlantaAI_Crash_M\n");
 
-    printf("Cargando SteamCar_Crash_M -> Models/steamCarCrash.obj ...\n");
-    SteamCar_Crash_M = Model(); SteamCar_Crash_M.LoadModel("Models/steamCarCrash.obj");
+    printf("Cargando SteamCar_Crash_M -> Models/steamCar.obj ...\n");
+    SteamCar_Crash_M = Model();
+    SteamCar_Crash_M.LoadModel("Models/steamCar.obj");
     printf("OK -> SteamCar_Crash_M\n");
 
     // Props del universo Crash
@@ -719,6 +758,14 @@ int main()
     );
     pointLightCount++;
 
+    pointLights[2] = PointLight(
+        0.53f, 0.81f, 0.98f,
+        0.0f, 1.2f,
+        62.0f, -1.0f, 18.0f,
+        0.3f, 0.2f, 0.1f
+    );
+    pointLightCount++;
+
     unsigned int spotLightCount = 0;
 
     // SpotLight 0: linterna de la camara (flash, se actualiza cada frame)
@@ -826,15 +873,16 @@ int main()
     // Bloques de pasto (12 instancias distribuidas en anillo alrededor de la escena)
     float      escBloquePasto = 1.0f;
     glm::vec3  scaleBloquePasto = glm::vec3(1.0f, 1.0f, 1.0f);
-
+    
     glm::vec3 pastoBasePos[4] = {
-        glm::vec3(160.0f, -2.0f,  130.0f),
-        glm::vec3(-110.0f, -2.0f,  185.0f),
-        glm::vec3(108.0f, -2.0f, -158.0f),
-        glm::vec3(-160.0f, -2.0f, -105.0f)
+        glm::vec3(160.0f, -2.0f, 115.0f),
+        glm::vec3(-110.0f, -2.0f, 170.0f),
+        glm::vec3(108.0f, -2.0f, -173.0f),
+        glm::vec3(-160.0f, -2.0f, -120.0f)
     };
+
     float pastoRotY[4] = { 0.0f, -90.0f, 90.0f, 180.0f };
-    float desplazamientoHaciaOrigen = 20.0f;
+    float desplazamientoHaciaOrigen = 25.0f;
 
     glm::vec3 pastoPos[12];
     glm::vec3 pastoRot[12];
@@ -855,7 +903,7 @@ int main()
     }
 
     // Reloj de planetas (objeto padre + piezas jerarquicas)
-    float      escReloj = 1.0f;
+    float      escReloj = 4.0f;
     glm::vec3  posReloj = glm::vec3(0.0f, -2.0f, -20.0f);
     glm::vec3  rotReloj = glm::vec3(0.0f, 0.0f, 0.0f);
     // Offsets y escalas locales de cada pieza del reloj
@@ -884,12 +932,12 @@ int main()
     glm::vec3  rotRelojPlanetas = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3  scaleRelojPlanetas = glm::vec3(1.0f, 1.0f, 1.0f);
     // Velocidades de orbita de cada engrane del reloj (grados/segundo)
-    float velRelojEngrane1 = 5.0f;
-    float velRelojEngrane2 = 2.0f;
-    float velRelojEngrane3 = 2.0f;
-    float velRelojEngrane4 = 2.0f;
-    float velRelojGalRedE = 2.0f;
-    float velRelojPlanetas = 2.0f;
+    float velRelojEngrane1 = 15.0f;
+    float velRelojEngrane2 = 6.0f;
+    float velRelojEngrane3 = 6.0f;
+    float velRelojEngrane4 = 6.0f;
+    float velRelojGalRedE = 6.0f;
+    float velRelojPlanetas = 6.0f;
     // Angulos de orbita acumulados (se actualizan cada frame)
     float angOrbitaRelojEngrane1 = 0.0f;
     float angOrbitaRelojEngrane2 = 0.0f;
@@ -899,7 +947,7 @@ int main()
     float angOrbitaRelojPlanetas = 0.0f;
 
     // Ciclo dia/noche
-    float duracionDia = 18000.0f; // frames que dura el dia
+    float duracionDia = 1800.0f; // frames que dura el dia
     float duracionTrans = 7.0f;     // frames que dura la transicion
     int   estadoCiclo = 0;        // 0=dia, 1=atardecer, 2=noche, 3=amanecer
     float ciclTimer = 0.0f;
@@ -908,14 +956,42 @@ int main()
     // Debug: timer para imprimir posicion de camara en consola
     float debugTimer = 0.0f;
 
+    // ============================================
+    // CAMARAS - HARRY POTTER / HERMIONE
+    // ============================================
+
+    int modoCamaraHP = 0;
+    bool prevF1Cam = false;
+    bool prevF2Cam = false;
+    bool prevF3Cam = false;
+    bool hpCamInit = false;
+
+    // Camara de tercera persona ligada a Hermione
+    float hpCamDistTP = 6.0f;
+    float hpCamAlturaTP = 3.0f;
+    float hpCamLookAhead = 1.5f;
+    float hpCamLookY = 1.2f;
+
+    // Camara aerea sobre plano XZ
+    glm::vec3 hpCamAereaPos(0.0f, 0.0f, 0.0f);
+    float hpCamAereaVel = 12.0f;
+    float hpCamAereaAltura = 16.0f;
+
+    // Camara de recorrido de interes
+    std::vector<glm::vec3> hpCamInteresPos;
+    std::vector<glm::vec3> hpCamInteresTarget;
+    float hpCamInteresTimer = 0.0f;
+    float hpCamInteresDuracion = 4.0f;
+
+
     // ================================================
     // VARIABLES - AVATAR BIOSHOCK: Big Daddy
     // ================================================
 
     // Escala global del Big Daddy
-    float      escBigDaddy = 1.0f;
+    float      escBigDaddy = 2.0f;
     // Posicion del objeto padre del Big Daddy en la escena
-    glm::vec3  posBigDaddy = glm::vec3(0.0f, -2.0f, 0.0f);
+    glm::vec3  posBigDaddy = glm::vec3(0.0f, -1.0f, 0.0f);
     // Offsets locales de cada parte del Big Daddy (relativas al padre)
     glm::vec3  offsetCuerpo = glm::vec3(-0.9f, 4.0f, 1.0f);
     glm::vec3  rotCuerpo = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -927,23 +1003,48 @@ int main()
     glm::vec3  rotPiernaIzq = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3  offsetPiernaDer = glm::vec3(-0.15f, 2.7f, 0.0f);
     glm::vec3  rotPiernaDer = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3  offsetTaladro = glm::vec3(1.6f, 2.8f, 0.1f);
+    glm::vec3  offsetTaladro = glm::vec3(1.6f, 0.7f, 0.1f);
     glm::vec3  rotTaladro = glm::vec3(0.0f, 0.0f, 45.0f);
     // Animacion del taladro (tecla 1)
-    float      taladroRot = 0.0f;
+    float      taladroRot = 1.0f;
     bool       taladroGirando = false;
     bool       prevTecla1 = false;
-    // Animacion de caminata del Big Daddy (tecla 3)
-    float      caminataTime = 0.0f;
-    float      caminataSpeed = 0.1f;
-    float      caminataAmp = 25.0f;  // amplitud piernas
-    float      caminataBrazoAmp = 10.0f;// amplitud brazos
-    bool       bigDaddyCaminando = false;
-    bool       prevTecla3 = false;
-    float      bigDaddyMovX = 0.0f;  // posicion X acumulada de la caminata
-    float      bigDaddyDir = 1.0f;  // direccion de caminata (+1 o -1)
-    float      bigDaddyVel = 0.05f;
-    float      bigDaddyLimite = 12.0f;
+    // Animacion de caminata del Big Daddy automatica por trayectoria cerrada
+    float caminataTime = 0.0f;
+    float caminataSpeed = 3.0f;
+    float caminataAmp = 25.0f;         // amplitud piernas
+    float caminataBrazoAmp = 10.0f;    // amplitud brazos
+    bool bigDaddyCaminando = true;
+
+    // Posicion y orientacion real del Big Daddy sobre el mundo
+    glm::vec3 bigDaddyPosActual = glm::vec3(-100.31f, posBigDaddy.y, 108.96f);
+    float bigDaddyRotY = 0.0f;
+    float bigDaddyVel = 9.0f;
+
+    // Ruta cerrada: se ignora Y de tus capturas y se conserva la Y actual del Big Daddy
+    std::vector<glm::vec3> rutaBigDaddy = {
+        glm::vec3(-100.31f, posBigDaddy.y, 108.96f),
+        glm::vec3(-101.90f, posBigDaddy.y, -113.97f),
+        glm::vec3(-94.94f,  posBigDaddy.y, -113.87f),
+        glm::vec3(8.21f,  posBigDaddy.y, -113.42f),
+        glm::vec3(1.95f,  posBigDaddy.y,  -62.86f),
+        glm::vec3(25.05f,  posBigDaddy.y,  -66.81f),
+        glm::vec3(102.11f,  posBigDaddy.y, -117.19f),
+        glm::vec3(104.51f,  posBigDaddy.y, -103.92f),
+        glm::vec3(102.80f,  posBigDaddy.y,   -6.70f),
+        glm::vec3(71.21f,  posBigDaddy.y,    7.65f),
+        glm::vec3(98.84f,  posBigDaddy.y,   64.48f),
+        glm::vec3(104.10f,  posBigDaddy.y,  108.58f),
+        glm::vec3(61.31f,  posBigDaddy.y,  106.53f),
+        glm::vec3(-17.02f,  posBigDaddy.y,  109.65f),
+        glm::vec3(-17.15f,  posBigDaddy.y,   65.64f),
+        glm::vec3(-49.46f,  posBigDaddy.y,    3.16f),
+        glm::vec3(56.64f,  posBigDaddy.y,   -0.67f),
+        glm::vec3(-25.46f,  posBigDaddy.y,   70.07f),
+        glm::vec3(-101.35f, posBigDaddy.y,  112.95f)
+    };
+
+    int bigDaddyNodoActual = 1;
     // Efecto de vibracion de camara al acercarse al Big Daddy
     float      vibracionAmp = 0.05f;
     float      vibracionRangoMax = 15.0f;
@@ -967,99 +1068,156 @@ int main()
     float      escPlasmido = 3.0f;
     glm::vec3  posPlasmido = glm::vec3(-10.0f, -1.0f, 0.0f);
     float      plasTime = 0.0f;
-    float      plasFloatSpeed = 0.05f;  // velocidad del seno de flotacion
+    float      plasFloatSpeed = 0.25f;  // velocidad del seno de flotacion
     float      plasFloatAmp = 0.04f;  // amplitud de flotacion en Y
-    float      plasRotSpeed = 1.0f;   // velocidad de rotacion en Y
+    float      plasRotSpeed = 3.0f;   // velocidad de rotacion en Y
     float      plasRotY = 0.0f;   // angulo de rotacion acumulado
-    float      plasHeartSpeed = 0.1f;   // velocidad del "latido" de escala
+    float      plasHeartSpeed = 0.4f;   // velocidad del "latido" de escala
     float      plasHeartAmp = 0.25f;  // amplitud del latido de escala
+
+
+    //copa animacion
+    float copaTime = 0.0f;
+    float copaFloatSpeed = 0.25f;
+    float copaFloatAmp = 0.04f;
+    float copaRotSpeed = 3.0f;
+    float copaRotY = 0.0f;
+    float copaHeartSpeed = 0.4f;
+    float copaHeartAmp = 0.20f;
 
     // ================================================
     // VARIABLES - AVATAR HARRY POTTER: Hermione
     // ================================================
 
     // Offset de toda la escena de Harry Potter en el mundo
-    glm::vec3  hpOffsetEscena = glm::vec3(55.0f, 0.0f, 25.0f);
+    glm::vec3 hpOffsetEscena = glm::vec3(55.0f, 0.0f, 25.0f);
 
-    // Posicion y rotacion de Hermione (movimiento con teclas U/J/H/K)
-    float      hpPosX = 0.0f;
-    float      hpPosZ = 0.0f;
-    float      hpRotPersonaje = 0.0f;
-    float      hpVelocidad = 2.0f;
+    // Posicion y rotacion de Hermione (movimiento con FLECHAS)
+    float hpPosX = 0.0f;
+    float hpPosZ = 0.0f;
+    float hpRotPersonaje = 0.0f;
+    float hpVelocidad = 10.0f;
+
     // Angulos de animacion de extremidades de Hermione
-    float      hpRotBrazoDer = 0.0f;
-    float      hpRotBrazoIzq = 0.0f;
-    float      hpRotPiernaDer = 0.0f;
-    float      hpRotPiernaIzq = 0.0f;
+    float hpRotBrazoDer = 0.0f;
+    float hpRotBrazoIzq = 0.0f;
+    float hpRotPiernaDer = 0.0f;
+    float hpRotPiernaIzq = 0.0f;
+
 
     // ================================================
-    // VARIABLES - OBJETOS HARRY POTTER
-    // ================================================
+  // VARIABLES - OBJETOS HARRY POTTER
+  // ================================================
 
-    // Carro volador: posicion, rotacion y llantas (teclas KP8/5/4/6)
-    float      hpCarroPosX = 0.0f;
-    float      hpCarroPosZ = -5.0f;
-    float      hpRotCarro = 0.0f;
-    float      hpRotLlantas = 0.0f;
-    float      hpVelocidadCarro = 2.0f;
+  // Carro volador: ruta automatica con tecla 1
+    std::vector<glm::vec3> hpCarroRuta = {
+        glm::vec3(-125.04f, 4.45f, -129.69f),
+        glm::vec3(-87.08f,  5.65f, -158.69f),
+        glm::vec3(114.75f,  2.43f, -153.83f),
+        glm::vec3(129.78f,  1.60f, -102.01f),
+        glm::vec3(129.45f,  1.62f,  95.31f),
+        glm::vec3(103.59f,  1.86f, 130.33f),
+        glm::vec3(-84.61f,  1.87f, 135.58f),
+        glm::vec3(-123.09f, 1.18f, 110.57f),
+        glm::vec3(-129.73f, 1.57f, -93.24f),
+        glm::vec3(-118.50f, 1.81f, -149.37f),
+        glm::vec3(-84.57f,  2.61f, -165.86f)
+    };
 
-    // Posiciones de los props de Harry Potter en la escena
-    glm::vec3  hpPosBolsa = hpOffsetEscena + glm::vec3(-8.0f, -1.0f, -4.0f);
-    glm::vec3  hpPosGiratiempo = hpOffsetEscena + glm::vec3(-10.0f, 0.0f, -7.0f);
-    glm::vec3  hpPosLibro = hpOffsetEscena + glm::vec3(3.0f, -1.0f, 3.0f);
-    glm::vec3  hpPosSnitch = hpOffsetEscena + glm::vec3(0.0f, 2.0f, -6.0f);
-    glm::vec3  hpPosCopa = hpOffsetEscena + glm::vec3(7.0f, -1.0f, -7.0f);
+    float hpCarroYFijo = 1.60f;
+    glm::vec3 hpCarroPos = glm::vec3(hpCarroRuta[0].x, hpCarroYFijo, hpCarroRuta[0].z);
+    float hpRotCarro = 0.0f;
+    float hpRotLlantas = 0.0f;
+    float hpVelocidadCarro = 10.0f;
+    bool hpCarroAutoActivo = false;
+    bool prevTeclaAuto1 = false;
+    int hpCarroWPActual = 1;
 
-    // Animacion de la Snitch dorada (vuelo con trayectoria senoidal)
-    float      hpSnitchVelocidadX = 1.0f;
-    float      hpSnitchAmplitudY = 1.5f;
-    float      hpSnitchFrecuencia = 2.0f;
-    bool       hpSnitchVisible = true;
-    bool       hpSnitchAnimacionActiva = false;
+    // Props de Harry Potter
+    glm::vec3 hpPosBolsa = hpOffsetEscena + glm::vec3(-8.0f, -1.0f, -4.0f);
+    glm::vec3 hpPosGiratiempo = hpOffsetEscena + glm::vec3(-10.0f, 0.0f, -7.0f);
+    glm::vec3 hpPosLibro = hpOffsetEscena + glm::vec3(3.0f, -1.0f, 3.0f);
+    glm::vec3 hpPosCopa = hpOffsetEscena + glm::vec3(7.0f, -1.0f, -7.0f);
 
-    // Posiciones de los objetos extra del Expreso de Hogwarts
-    glm::vec3  posCabinaExpreso = hpOffsetEscena + glm::vec3(0.0f, -2.0f, 15.0f);
-    glm::vec3  posVagonExpreso = hpOffsetEscena + glm::vec3(5.0f, -2.0f, 15.0f);
-    glm::vec3  posBielaIzqExpreso = hpOffsetEscena + glm::vec3(10.0f, -2.0f, 15.0f);
-    glm::vec3  posBielaMotrizIzq = hpOffsetEscena + glm::vec3(15.0f, -2.0f, 15.0f);
-    glm::vec3  posEjeDelanExpreso = hpOffsetEscena + glm::vec3(20.0f, -2.0f, 15.0f);
-    glm::vec3  posEjeTrasExpreso = hpOffsetEscena + glm::vec3(25.0f, -2.0f, 15.0f);
-    glm::vec3  posEjeVagonExpreso = hpOffsetEscena + glm::vec3(30.0f, -2.0f, 15.0f);
-    glm::vec3  posPistonIzqExpreso = hpOffsetEscena + glm::vec3(35.0f, -2.0f, 15.0f);
-    glm::vec3  posLlantaSteamCar3 = hpOffsetEscena + glm::vec3(40.0f, -2.0f, 15.0f);
-    glm::vec3  posSteamCar3 = hpOffsetEscena + glm::vec3(45.0f, -2.0f, 15.0f);
+    // Snitch: ruta automatica con tecla 3
+    std::vector<glm::vec3> hpSnitchRuta = {
+        glm::vec3(99.43f,   5.88f, -32.88f),
+        glm::vec3(49.79f,   3.06f,  47.08f),
+        glm::vec3(31.90f,   5.82f, 102.71f),
+        glm::vec3(-11.96f,  2.07f,  19.60f),
+        glm::vec3(-11.74f,  3.85f, -27.56f),
+        glm::vec3(17.69f,   4.55f, -103.31f),
+        glm::vec3(-97.00f,  3.90f, -107.43f),
+        glm::vec3(-98.47f,  6.74f,  -5.85f),
+        glm::vec3(-99.56f,  4.43f,  85.56f),
+        glm::vec3(33.56f,   4.25f,   4.02f)
+    };
+
+    glm::vec3 hpPosSnitch = hpSnitchRuta[0];
+    bool hpSnitchVisible = true;
+    bool hpSnitchAnimacionActiva = false;
+    bool prevTeclaAuto3 = false;
+    int hpSnitchWPActual = 1;
+    float hpSnitchVelocidadRuta = 15.0f;
+
+    // Expreso de Hogwarts: posiciones fijas
+    glm::vec3 posCabinaExpreso = hpOffsetEscena + glm::vec3(0.0f, -2.0f, 15.0f);
+    glm::vec3 posVagonExpreso = hpOffsetEscena + glm::vec3(5.0f, -2.0f, 15.0f);
+    glm::vec3 posBielaIzqExpreso = hpOffsetEscena + glm::vec3(10.0f, -2.0f, 15.0f);
+    glm::vec3 posBielaMotrizIzq = hpOffsetEscena + glm::vec3(15.0f, -2.0f, 15.0f);
+    glm::vec3 posEjeDelanExpreso = hpOffsetEscena + glm::vec3(20.0f, -2.0f, 15.0f);
+    glm::vec3 posEjeTrasExpreso = hpOffsetEscena + glm::vec3(25.0f, -2.0f, 15.0f);
+    glm::vec3 posEjeVagonExpreso = hpOffsetEscena + glm::vec3(30.0f, -2.0f, 15.0f);
+    glm::vec3 posPistonIzqExpreso = hpOffsetEscena + glm::vec3(35.0f, -2.0f, 15.0f);
+    glm::vec3 posLlantaSteamCar3 = hpOffsetEscena + glm::vec3(40.0f, -2.0f, 15.0f);
+    glm::vec3 posSteamCar3 = hpOffsetEscena + glm::vec3(45.0f, -2.0f, 15.0f);
+
 
     // ================================================
     // VARIABLES - AVATAR CRASH BANDICOOT: Crash
     // ================================================
 
-    // Offset de toda la escena de Crash en el mundo
-    glm::vec3  crashOffsetEscena = glm::vec3(-55.0f, 0.0f, 25.0f);
+    glm::vec3 crashOffsetEscena = glm::vec3(-55.0f, 0.0f, 25.0f);
 
-    // Posicion y rotacion de Crash (movimiento con teclas I/K/J/L)
-    float      crashPosX = 0.0f;
-    float      crashPosZ = 0.0f;
-    float      crashRotY = 0.0f;
-    float      crashVelocidad = 2.0f;
-    // Angulos de animacion de extremidades de Crash
-    float      crashRotBrazoDer = 0.0f;
-    float      crashRotBrazoIzq = 0.0f;
-    float      crashRotPiernaDer = 0.0f;
-    float      crashRotPiernaIzq = 0.0f;
+    float crashPosX = 0.0f;
+    float crashPosZ = 0.0f;
+    float crashRotY = 0.0f;
+    float crashVelocidad = 2.0f;
+
+    float crashRotBrazoDer = 0.0f;
+    float crashRotBrazoIzq = 0.0f;
+    float crashRotPiernaDer = 0.0f;
+    float crashRotPiernaIzq = 0.0f;
+
 
     // ================================================
     // VARIABLES - OBJETOS CRASH BANDICOOT
     // ================================================
 
-    // Go-kart de Crash: posicion, rotacion y llantas (teclas KP1/3/2)
-    float      kartPosX = 0.0f;
-    float      kartPosZ = -6.0f;
-    float      kartRotY = 0.0f;
-    float      kartVelocidad = 3.0f;
-    float      kartRotLlantas = 0.0f;
+    // Go-kart de Crash: ruta automatica con tecla 2
+    std::vector<glm::vec3> kartRuta = {
+        glm::vec3(-53.65f,  2.59f, -151.59f),
+        glm::vec3(-79.39f,  2.78f, -152.69f),
+        glm::vec3(-116.51f, 1.83f, -129.59f),
+        glm::vec3(-120.70f, 2.37f,   76.67f),
+        glm::vec3(-103.70f, 2.25f,  117.08f),
+        glm::vec3(90.09f,   2.16f,  121.69f),
+        glm::vec3(119.34f,  2.59f,   96.96f),
+        glm::vec3(120.59f,  2.58f, -113.85f),
+        glm::vec3(95.87f,   2.86f, -148.83f),
+        glm::vec3(-35.04f,  2.35f, -150.78f)
+    };
+
+    glm::vec3 kartPos = kartRuta[0];
+    float kartRotY = 0.0f;
+    float kartVelocidad = 8.0f;
+    float kartRotLlantas = 0.0f;
+    bool kartAutoActivo = false;
+    bool prevTeclaAuto2 = false;
+    int kartWPActual = 1;
 
     // Steam car de Crash (decorativo, posicion fija)
-    glm::vec3  posSteamCar = crashOffsetEscena + glm::vec3(8.0f, -1.5f, -8.0f);
+    glm::vec3 posSteamCar = crashOffsetEscena + glm::vec3(8.0f, -1.5f, -8.0f);
 
     // Posiciones de los props del universo Crash (linea de display en Z+15)
     glm::vec3  posArbolWumpa = crashOffsetEscena + glm::vec3(0.0f, -2.0f, 15.0f);
@@ -1083,12 +1241,24 @@ int main()
     glm::vec3  posJoyasCrash = crashOffsetEscena + glm::vec3(90.0f, -2.0f, 15.0f);
     glm::vec3  posMascaraAku = crashOffsetEscena + glm::vec3(95.0f, -2.0f, 15.0f);
     glm::vec3  posMascaraUka = crashOffsetEscena + glm::vec3(100.0f, -2.0f, 15.0f);
-    glm::vec3  posPista = crashOffsetEscena + glm::vec3(105.0f, -1.0f, 15.0f);
+    glm::vec3 posPista = glm::vec3(0.0f, -1.0f, 8.0f);
     glm::vec3  posSteamCar1 = crashOffsetEscena + glm::vec3(110.0f, -2.0f, 15.0f);
     glm::vec3  posSteamCar2 = crashOffsetEscena + glm::vec3(115.0f, -2.0f, 15.0f);
     glm::vec3  posTotem1Crash = crashOffsetEscena + glm::vec3(120.0f, -2.0f, 15.0f);
     glm::vec3  posTotem2Crash = crashOffsetEscena + glm::vec3(125.0f, -2.0f, 15.0f);
     glm::vec3  posRuedaSteamCar2 = crashOffsetEscena + glm::vec3(130.0f, -2.0f, 15.0f);
+
+
+    // ================================================
+    // VARIABLES - SISTEMA DE CAMARAS
+    // ================================================
+    int modoCamara = 1;           // 1=3raPersona, 2=Aerea, 3=Interes
+    bool prevTeclaVirgula = false; // tecla ,
+    bool prevTeclaPunto = false;   // tecla .
+    bool prevTeclaMenos = false;   // tecla -
+    int puntoInteresActual = 0;
+    bool prevTeclaV = false;
+
 
     // ================================================
     // LOOP PRINCIPAL
@@ -1098,13 +1268,16 @@ int main()
         // --- Delta time ---
         GLfloat now = glfwGetTime();
         deltaTime = now - lastTime;
-        deltaTime += (now - lastTime) / limitFPS;
+        if (deltaTime > 0.05f) deltaTime = 0.05f; // cap a 20fps minimo
         lastTime = now;
 
         glfwPollEvents();
-        camera.keyControl(mainWindow.getsKeys(), deltaTime);
+        // Camara libre siempre procesa mouse, WASD solo en modo libre
         camera.mouseControl(mainWindow.getXChange(), mainWindow.getYChange());
-
+        if (modoCamara == 3)
+        {
+            camera.keyControl(mainWindow.getsKeys(), deltaTime);
+        }
         // --- Debug: posicion e instruccion de captura en consola ---
         debugTimer += deltaTime;
         if (debugTimer >= 0.05f)
@@ -1160,36 +1333,78 @@ int main()
         // LOGICA DE ANIMACIONES Y CONTROLES
         // ============================================
 
-        // --- Taladro del Big Daddy (tecla 1: toggle) ---
-        bool currTecla1 = mainWindow.getsKeys()[GLFW_KEY_1];
-        if (currTecla1 && !prevTecla1) taladroGirando = !taladroGirando;
-        prevTecla1 = currTecla1;
-        if (taladroGirando) {
-            taladroRot += 100.0f * deltaTime;
-            if (taladroRot >= 360.0f) taladroRot -= 360.0f;
+        //copa animacion como plasmido
+        copaTime += deltaTime;
+        copaRotY += copaRotSpeed * deltaTime;
+        if (copaRotY > 360.0f) copaRotY -= 360.0f;
+
+        float copaOffsetY = copaFloatAmp * sinf(copaTime * copaFloatSpeed);
+        float copaHeartbeat = fabsf(sinf(copaTime * copaHeartSpeed));
+        float copaEscActual = 1.0f + copaHeartAmp * copaHeartbeat;
+
+        // --- Taladro del Big Daddy automatico mientras camina ---
+        if (bigDaddyCaminando)
+        {
+            taladroRot += 150.0f * deltaTime;
+            if (taladroRot > 360.0f)
+                taladroRot -= 360.0f;
         }
 
-        // --- Caminata del Big Daddy (tecla 2: toggle) ---
-        bool currTecla2 = mainWindow.getsKeys()[GLFW_KEY_2];
-        if (currTecla2 && !prevTecla3) bigDaddyCaminando = !bigDaddyCaminando;
-        prevTecla3 = currTecla2;
-
-        // Angulos de extremidades calculados cada frame
+        // --- Caminata automatica del Big Daddy por ruta cerrada ---
         float pasoSeno = 0.0f;
         float anguloPiernaIzq = 0.0f, anguloPiernaDer = 0.0f;
         float anguloBrazoIzq = 0.0f, anguloBrazoDer = 0.0f;
 
-        if (bigDaddyCaminando)
+        if (rutaBigDaddy.size() >= 2)
         {
-            caminataTime += deltaTime;
-            pasoSeno = sinf(caminataTime * caminataSpeed);
-            anguloPiernaIzq = pasoSeno * caminataAmp;
-            anguloPiernaDer = -pasoSeno * caminataAmp;
-            anguloBrazoIzq = -pasoSeno * caminataBrazoAmp;
-            anguloBrazoDer = pasoSeno * caminataBrazoAmp;
-            bigDaddyMovX += bigDaddyDir * bigDaddyVel * deltaTime;
-            if (bigDaddyMovX > bigDaddyLimite) { bigDaddyMovX = bigDaddyLimite; bigDaddyDir = -1.0f; }
-            if (bigDaddyMovX < -bigDaddyLimite) { bigDaddyMovX = -bigDaddyLimite; bigDaddyDir = 1.0f; }
+            glm::vec3 destino = rutaBigDaddy[bigDaddyNodoActual];
+            glm::vec3 direccion = destino - bigDaddyPosActual;
+            direccion.y = 0.0f;
+
+            float distancia = glm::length(direccion);
+
+            if (distancia > 0.001f)
+            {
+                bigDaddyCaminando = true;
+
+                glm::vec3 dirNorm = glm::normalize(direccion);
+                float paso = bigDaddyVel * deltaTime;
+
+                if (paso >= distancia)
+                {
+                    bigDaddyPosActual = destino;
+                    bigDaddyNodoActual = (bigDaddyNodoActual + 1) % rutaBigDaddy.size();
+                }
+                else
+                {
+                    bigDaddyPosActual += dirNorm * paso;
+                }
+
+                bigDaddyPosActual.y = posBigDaddy.y;
+
+                // Ajuste para que el modelo mire hacia donde avanza
+                bigDaddyRotY = -glm::degrees(atan2(dirNorm.x, dirNorm.z)) + 180.0f;
+
+                // Reutiliza la animacion que ya tenias en brazos y piernas
+                caminataTime += deltaTime;
+                pasoSeno = sinf(caminataTime * caminataSpeed);
+
+                anguloPiernaIzq = pasoSeno * caminataAmp;
+                anguloPiernaDer = -pasoSeno * caminataAmp;
+                anguloBrazoIzq = -pasoSeno * caminataBrazoAmp;
+                anguloBrazoDer = pasoSeno * caminataBrazoAmp;
+            }
+            else
+            {
+                bigDaddyPosActual = destino;
+                bigDaddyNodoActual = (bigDaddyNodoActual + 1) % rutaBigDaddy.size();
+            }
+        }
+        else
+        {
+            bigDaddyCaminando = false;
+            bigDaddyPosActual = posBigDaddy;
+            bigDaddyRotY = 0.0f;
         }
 
         // --- Apertura del medkit al acercarse ---
@@ -1203,6 +1418,59 @@ int main()
             puertaAngulo -= puertaSpeed * deltaTime;
             if (puertaAngulo < puertaTarget) puertaAngulo = puertaTarget;
         }
+
+
+        bool* keys = mainWindow.getsKeys();
+
+        // ============================================
+                // CONTROLES - SISTEMA DE CAMARAS (coma=modo1, punto=modo2, menos=modo3)
+                // ============================================
+
+        bool currVirgula = keys[GLFW_KEY_COMMA];
+        bool currPunto = keys[GLFW_KEY_PERIOD];
+        bool currM = keys[GLFW_KEY_M];
+
+        if (currVirgula && !prevTeclaVirgula) {
+            modoCamara = 1;
+            printf("Camara: Primera Persona (Hermione)\n");
+        }
+        if (currPunto && !prevTeclaPunto) {
+            modoCamara = 2;
+            printf("Camara: Tercera Persona (Hermione)\n");
+        }
+        if (currM && !prevTeclaMenos) {
+            modoCamara = 3;
+            printf("Camara: Libre (WASD + mouse)\n");
+        }
+        prevTeclaVirgula = currVirgula;
+        prevTeclaPunto = currPunto;
+        prevTeclaMenos = currM;
+
+        // Camara modo 3: avanzar punto de interes con V
+        if (modoCamara == 3) {
+            bool currV = keys[GLFW_KEY_V];
+            if (currV && !prevTeclaV) {
+                puntoInteresActual = (puntoInteresActual + 1) % 3;
+                printf("Punto de interes: %d\n", puntoInteresActual);
+            }
+            prevTeclaV = keys[GLFW_KEY_V];
+            hpCamInteresTimer += deltaTime;
+            float cicloTotal = hpCamInteresDuracion * (float)hpCamInteresPos.size();
+            if (hpCamInteresTimer >= cicloTotal) hpCamInteresTimer = 0.0f;
+        }
+
+        // Camara aerea modo 2: desplazamiento WASD
+        if (modoCamara == 2) {
+            if (keys[GLFW_KEY_W]) hpCamAereaPos.z -= hpCamAereaVel * deltaTime;
+            if (keys[GLFW_KEY_S]) hpCamAereaPos.z += hpCamAereaVel * deltaTime;
+            if (keys[GLFW_KEY_A]) hpCamAereaPos.x -= hpCamAereaVel * deltaTime;
+            if (keys[GLFW_KEY_D]) hpCamAereaPos.x += hpCamAereaVel * deltaTime;
+            hpCamAereaPos.y = hpOffsetEscena.y + hpCamAereaAltura;
+        }
+
+        // Mantener compatibilidad con modoCamaraHP
+        modoCamaraHP = modoCamara - 1;
+        if (modoCamaraHP < 0) modoCamaraHP = 0;
 
         // --- Ciclo dia/noche (tecla T: avanza manualmente) ---
         bool currTeclaT = mainWindow.getsKeys()[GLFW_KEY_T];
@@ -1225,7 +1493,6 @@ int main()
         case 3: factorDia = ciclTimer / duracionTrans; break;
         }
 
-        // Interpolacion de ambient/diffuse de la luz direccional segun factorDia
         float ambientDia = 0.3f, diffuseDia = 0.8f;
         float ambientNoche = 0.05f, diffuseNoche = 0.1f;
         float ambientActual = ambientNoche + (ambientDia - ambientNoche) * factorDia;
@@ -1240,20 +1507,104 @@ int main()
         float heartbeat = fabsf(sinf(plasTime * plasHeartSpeed));
         float plasEscActual = escPlasmido + plasHeartAmp * heartbeat;
 
-        // La luz roja del plasmido sigue su posicion flotante
         pointLights[1] = PointLight(
             1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
             posPlasmido.x, posPlasmido.y + plasOffsetY, posPlasmido.z,
             0.5f, 0.3f, 0.2f
         );
 
+        pointLights[2] = PointLight(
+            0.53f, 0.81f, 0.98f,
+            0.0f, 1.2f,
+            hpPosCopa.x, hpPosCopa.y + copaOffsetY, hpPosCopa.z,
+            0.3f, 0.2f, 0.1f
+        );
+
+        // ============================================
+        // VIEW MATRIX SEGUN CAMARA ACTIVA DE HERMIONE
+        // ============================================
+
+        glm::vec3 hpWorldPos = hpOffsetEscena + glm::vec3(hpPosX, 1.0f, hpPosZ);
+        float hpYawRad = hpRotPersonaje * toRadians;
+        glm::vec3 hpForward = glm::normalize(glm::vec3(sinf(hpYawRad), 0.0f, cosf(hpYawRad)));
+
+        glm::vec3 camPosActiva(0.0f, 0.0f, 0.0f);
+        glm::vec3 camTargetActiva(0.0f, 0.0f, 0.0f);
+        glm::vec3 camDirActiva(0.0f, 0.0f, -1.0f);
+
+        if (modoCamara == 1)
+        {
+            // Primera persona: camara en la cabeza de Hermione, adelantada para no ver el modelo
+            camPosActiva = hpWorldPos + glm::vec3(0.0f, 1.6f, 0.0f) + hpForward * 0.7f;
+            camTargetActiva = camPosActiva + hpForward * 5.0f;
+        }
+        else if (modoCamara == 2)
+        {
+            // Tercera persona: camara detras y arriba mirando a Hermione
+            camPosActiva = hpWorldPos - hpForward * hpCamDistTP + glm::vec3(0.0f, hpCamAlturaTP, 0.0f);
+            camTargetActiva = hpWorldPos + glm::vec3(0.0f, hpCamLookY, 0.0f) + hpForward * hpCamLookAhead;
+        }
+        else if (modoCamara == 3)
+        {
+            // Camara libre: WASD ya se aplico arriba, solo leer posicion
+            camPosActiva = camera.getCameraPosition();
+            camTargetActiva = camPosActiva + camera.getCameraDirection() * 5.0f;
+        }
+
+        else
+        {
+
+            // Puntos de interes: recorre 3 elementos del escenario HP
+            int n = (int)hpCamInteresPos.size();
+            int tramo = (int)(hpCamInteresTimer / hpCamInteresDuracion);
+            if (tramo >= n) tramo = 0;
+
+            int siguiente = (tramo + 1) % n;
+            float t = (hpCamInteresTimer - (float)tramo * hpCamInteresDuracion) / hpCamInteresDuracion;
+
+            camPosActiva = glm::mix(hpCamInteresPos[tramo], hpCamInteresPos[siguiente], t);
+            camTargetActiva = glm::mix(hpCamInteresTarget[tramo], hpCamInteresTarget[siguiente], t);
+        }
+
+        camDirActiva = glm::normalize(camTargetActiva - camPosActiva);
+
         // --- Vibracion de camara por proximidad al Big Daddy ---
-        glm::vec3 camPos = camera.getCameraPosition();
-        float distCamBD = glm::length(camPos - posBigDaddy);
+        float distCamBD = glm::length(camPosActiva - bigDaddyPosActual);
         float factorCercania = 1.0f - (distCamBD / vibracionRangoMax);
         if (factorCercania < 0.0f) factorCercania = 0.0f;
+
         float vibX = sinf(caminataTime * caminataSpeed * 2.0f) * vibracionAmp * factorCercania;
         float vibY = fabsf(sinf(caminataTime * caminataSpeed * 2.0f)) * vibracionAmp * factorCercania;
+
+        // En modo libre NO sobreescribir la camara, ya tiene su posicion de WASD
+        if (modoCamara != 3)
+        {
+            camera.setPosition(camPosActiva);
+            camera.lookAt(camTargetActiva);
+        }
+        else
+        {
+            // En modo libre, recalcular camPosActiva/Target desde la camara actual
+            camPosActiva = camera.getCameraPosition();
+            camTargetActiva = camPosActiva + camera.getCameraDirection() * 5.0f;
+            camDirActiva = camera.getCameraDirection();
+        }
+
+        glm::mat4 viewMatrix = glm::lookAt(
+            camPosActiva,
+            camTargetActiva,
+            glm::vec3(0.0f, 1.0f, 0.0f)
+        );
+        viewMatrix = glm::translate(viewMatrix, glm::vec3(vibX, vibY, 0.0f));
+
+        glUniformMatrix4fv(uniformView, 1, GL_FALSE, glm::value_ptr(viewMatrix));
+        glUniform3f(uniformEyePosition, camPosActiva.x, camPosActiva.y, camPosActiva.z);
+
+        glm::vec3 lowerLight = camPosActiva;
+        lowerLight.y -= 0.3f;
+        spotLights[0].SetFlash(lowerLight, camDirActiva);
+
+
 
         // --- Engranes del reloj (orbita continua cada frame) ---
         angOrbitaRelojEngrane1 -= velRelojEngrane1 * deltaTime;
@@ -1300,18 +1651,110 @@ int main()
         );
 
         // ============================================
-        // CONTROLES - AVATAR HARRY POTTER: Hermione
+ // CONTROLES - CAMARAS HARRY POTTER / HERMIONE
+ // ============================================
+// Inicializacion una sola vez
+        if (!hpCamInit)
+        {
+            hpCamAereaPos = hpOffsetEscena + glm::vec3(0.0f, hpCamAereaAltura, 18.0f);
+
+            hpCamInteresPos = {
+                hpOffsetEscena + glm::vec3(-12.0f, 6.0f, -10.0f),
+                hpOffsetEscena + glm::vec3(0.0f, 7.0f,  12.0f),
+                hpOffsetEscena + glm::vec3(12.0f, 6.0f, -10.0f)
+            };
+
+            hpCamInteresTarget = {
+                hpPosGiratiempo + glm::vec3(0.0f, 0.8f, 0.0f),
+                hpPosLibro + glm::vec3(0.0f, 0.7f, 0.0f),
+                hpPosCopa + glm::vec3(0.0f, 1.0f, 0.0f)
+            };
+
+            hpCamInit = true;
+        }
+
         // ============================================
-        bool* keys = mainWindow.getsKeys();
-        bool hpIsMoving = false;
+        // CONTROLES - OBJETOS HARRY POTTER
+        // ============================================
 
-        if (keys[GLFW_KEY_W]) { hpPosZ -= hpVelocidad * deltaTime; hpRotPersonaje = 180.0f; hpIsMoving = true; }
-        else if (keys[GLFW_KEY_S]) { hpPosZ += hpVelocidad * deltaTime; hpRotPersonaje = 0.0f;   hpIsMoving = true; }
-        else if (keys[GLFW_KEY_A]) { hpPosX -= hpVelocidad * deltaTime; hpRotPersonaje = -90.0f; hpIsMoving = true; }
-        else if (keys[GLFW_KEY_D]) { hpPosX += hpVelocidad * deltaTime; hpRotPersonaje = 90.0f;  hpIsMoving = true; }
+        // Toggle carro volador -> tecla 1
+        bool currAuto1 = keys[GLFW_KEY_1];
+        if (currAuto1 && !prevTeclaAuto1) {
+            hpCarroAutoActivo = !hpCarroAutoActivo;
+        }
+        prevTeclaAuto1 = currAuto1;
 
-        if (hpIsMoving) {
-            float hpAnim = sin(glfwGetTime() * 5.0f) * 45.0f;
+        // Toggle snitch -> tecla 3
+        bool currAuto3 = keys[GLFW_KEY_3];
+        if (currAuto3 && !prevTeclaAuto3) {
+            hpSnitchAnimacionActiva = !hpSnitchAnimacionActiva;
+            hpSnitchVisible = true;
+        }
+        prevTeclaAuto3 = currAuto3;
+
+        // Actualizacion carro volador
+        if (hpCarroAutoActivo)
+        {
+            if (!hpCarroRuta.empty())
+            {
+                glm::vec3 target = hpCarroRuta[hpCarroWPActual];
+                target.y = hpCarroYFijo;
+
+                glm::vec3 delta = target - hpCarroPos;
+                delta.y = 0.0f;
+                float dist = glm::length(delta);
+
+                if (dist < 0.60f)
+                {
+                    hpCarroWPActual = (hpCarroWPActual + 1) % hpCarroRuta.size();
+
+                    target = hpCarroRuta[hpCarroWPActual];
+                    target.y = hpCarroYFijo;
+
+                    delta = target - hpCarroPos;
+                    delta.y = 0.0f;
+                    dist = glm::length(delta);
+                }
+
+                if (dist > 0.0001f)
+                {
+                    glm::vec3 dir = delta / dist;
+                    float step = hpVelocidadCarro * deltaTime;
+                    if (step > dist) step = dist;
+
+                    hpCarroPos += dir * step;
+                    hpCarroPos.y = hpCarroYFijo;
+
+                    hpRotCarro = atan2(dir.x, dir.z) / toRadians;
+                }
+                else
+                {
+                    hpCarroPos.y = hpCarroYFijo;
+                }
+            }
+
+            hpRotLlantas += 250.0f * deltaTime;
+            if (hpRotLlantas > 360.0f) hpRotLlantas -= 360.0f;
+        }
+
+        // Actualizacion snitch
+        if (hpSnitchAnimacionActiva && hpSnitchVisible) {
+            UpdatePathFollower(hpPosSnitch, hpRotCarro, hpSnitchWPActual, hpSnitchRuta, hpSnitchVelocidadRuta, deltaTime, 0.80f);
+        }
+
+        // ============================================
+        // CONTROLES - AVATAR CRASH: Crash
+        // ============================================
+
+        // --- Hermione: movimiento con flechas ---
+        bool hpMoving = false;
+        if (keys[GLFW_KEY_UP]) { hpPosZ -= hpVelocidad * deltaTime; hpRotPersonaje = 180.0f; hpMoving = true; }
+        else if (keys[GLFW_KEY_DOWN]) { hpPosZ += hpVelocidad * deltaTime; hpRotPersonaje = 0.0f;   hpMoving = true; }
+        else if (keys[GLFW_KEY_LEFT]) { hpPosX -= hpVelocidad * deltaTime; hpRotPersonaje = -90.0f; hpMoving = true; }
+        else if (keys[GLFW_KEY_RIGHT]) { hpPosX += hpVelocidad * deltaTime; hpRotPersonaje = 90.0f;  hpMoving = true; }
+
+        if (hpMoving) {
+            float hpAnim = sinf(glfwGetTime() * 5.0f) * 30.0f;
             hpRotBrazoDer = hpAnim; hpRotBrazoIzq = -hpAnim;
             hpRotPiernaDer = -hpAnim; hpRotPiernaIzq = hpAnim;
         }
@@ -1319,39 +1762,9 @@ int main()
             hpRotBrazoDer = hpRotBrazoIzq = hpRotPiernaDer = hpRotPiernaIzq = 0.0f;
         }
 
-        // ============================================
-        // CONTROLES - OBJETOS HARRY POTTER
-        // ============================================
-
-
-        // Snitch: 3 activa vuelo, 4 reposiciona aleatoriamente
-        if (keys[GLFW_KEY_3]) { hpSnitchAnimacionActiva = true; }
-        if (keys[GLFW_KEY_4]) {
-            float randomX = (rand() % 30) - 15.0f;
-            float randomY = (rand() % 5) + 1.0f;
-            float randomZ = (rand() % 20) - 10.0f;
-            hpPosSnitch = hpOffsetEscena + glm::vec3(randomX, randomY, randomZ);
-            hpSnitchVisible = true;
-            hpSnitchAnimacionActiva = false;
-        }
-
-        // Trayectoria senoidal de la snitch
-        if (hpSnitchAnimacionActiva && hpSnitchVisible) {
-            hpPosSnitch.x += hpSnitchVelocidadX * deltaTime;
-            hpPosSnitch.y = hpOffsetEscena.y + 2.0f +
-                (sin((hpPosSnitch.x - hpOffsetEscena.x) * hpSnitchFrecuencia) * hpSnitchAmplitudY);
-            if (hpPosSnitch.x > hpOffsetEscena.x + 40.0f) hpSnitchVisible = false;
-        }
-
-        // ============================================
-        // CONTROLES - AVATAR CRASH: Crash
-        // ============================================
+        // Crash sin control por teclado (queda estatico)
         bool crashMoving = false;
-
-        if (keys[GLFW_KEY_UP]) { crashPosZ -= crashVelocidad * deltaTime; crashRotY = 180.0f; crashMoving = true; }
-        else if (keys[GLFW_KEY_DOWN]) { crashPosZ += crashVelocidad * deltaTime; crashRotY = 0.0f; crashMoving = true; }
-        else if (keys[GLFW_KEY_LEFT]) { crashPosX -= crashVelocidad * deltaTime; crashRotY = -90.0f; crashMoving = true; }
-        else if (keys[GLFW_KEY_RIGHT]) { crashPosX += crashVelocidad * deltaTime; crashRotY = 90.0f; crashMoving = true; }
+        crashRotBrazoDer = crashRotBrazoIzq = crashRotPiernaDer = crashRotPiernaIzq = 0.0f;
 
         if (crashMoving) {
             float crashAnim = sin(glfwGetTime() * 5.0f) * 35.0f;
@@ -1361,10 +1774,23 @@ int main()
         else {
             crashRotBrazoDer = crashRotBrazoIzq = crashRotPiernaDer = crashRotPiernaIzq = 0.0f;
         }
-
         // ============================================
         // CONTROLES - OBJETOS CRASH: Kart
         // ============================================
+
+        // Toggle kart -> tecla 2
+        bool currAuto2 = keys[GLFW_KEY_2];
+        if (currAuto2 && !prevTeclaAuto2) {
+            kartAutoActivo = !kartAutoActivo;
+        }
+        prevTeclaAuto2 = currAuto2;
+
+        // Actualizacion kart
+        if (kartAutoActivo) {
+            UpdatePathFollower(kartPos, kartRotY, kartWPActual, kartRuta, kartVelocidad, deltaTime);
+            kartRotLlantas += 280.0f * deltaTime;
+            if (kartRotLlantas >= 360.0f) kartRotLlantas -= 360.0f;
+        }
         // Kart de Crash desactivado por ahora
         // ============================================
         // RENDER
@@ -1391,20 +1817,14 @@ int main()
 
         glUniformMatrix4fv(uniformProjection, 1, GL_FALSE, glm::value_ptr(projection));
 
-        // View matrix con efecto de vibracion al acercarse al Big Daddy
-        glm::mat4 viewMatrix = camera.calculateViewMatrix();
-        viewMatrix = glm::translate(viewMatrix, glm::vec3(vibX, vibY, 0.0f));
+
+        // Uniforms de camara activa (ya configurada arriba con setPosition/lookAt)
         glUniformMatrix4fv(uniformView, 1, GL_FALSE, glm::value_ptr(viewMatrix));
+        glUniform3f(uniformEyePosition, camPosActiva.x, camPosActiva.y, camPosActiva.z);
 
-        glUniform3f(uniformEyePosition,
-            camera.getCameraPosition().x,
-            camera.getCameraPosition().y,
-            camera.getCameraPosition().z);
-
-        // Linterna de la camara
-        glm::vec3 lowerLight = camera.getCameraPosition();
-        lowerLight.y -= 0.3f;
-        spotLights[0].SetFlash(lowerLight, camera.getCameraDirection());
+        glm::vec3 lowerLightRender = camPosActiva;
+        lowerLightRender.y -= 0.3f;
+        spotLights[0].SetFlash(lowerLightRender, camDirActiva);
 
         shaderList[0].SetDirectionalLight(&mainLight);
         shaderList[0].SetPointLights(pointLights, pointLightCount);
@@ -1573,11 +1993,10 @@ int main()
         // RENDER - AVATAR BIOSHOCK: Big Daddy
         // ============================================
 
-        // Matriz base del Big Daddy (padre jerarquico: posicion + direccion de marcha)
+        // Matriz base del Big Daddy padre jerarquico posicion + direccion real de la ruta
         glm::mat4 modelaux_BD = glm::mat4(1.0f);
-        modelaux_BD = glm::translate(modelaux_BD, posBigDaddy + glm::vec3(bigDaddyMovX, 0.0f, 0.0f));
-        float rotY_BD = (bigDaddyDir > 0.0f) ? -90.0f : 90.0f;
-        modelaux_BD = glm::rotate(modelaux_BD, rotY_BD * toRadians, glm::vec3(0.0f, 1.0f, 0.0f));
+        modelaux_BD = glm::translate(modelaux_BD, bigDaddyPosActual);
+        modelaux_BD = glm::rotate(modelaux_BD, bigDaddyRotY * toRadians, glm::vec3(0.0f, 1.0f, 0.0f));
 
         // Big Daddy: torso (hijo del padre)
         model = modelaux_BD;
@@ -1634,16 +2053,16 @@ int main()
         Material_brillante.UseMaterial(uniformSpecularIntensity, uniformShininess);
         BigDaddyPiernaDer_M.RenderModel();
 
-        // Big Daddy: taladro (hijo del brazo der; escala -X para espejear el mesh)
+        // Big Daddy: taladro (hijo del brazo der, escala -X para espejear el mesh)
         model = modelaux_BD;
-        model = glm::translate(model, offsetTaladro);
+        model = glm::translate(model, offsetTaladro * escBigDaddy);
         model = glm::rotate(model, -anguloBrazoDer * toRadians, glm::vec3(1.0f, 0.0f, 0.0f));
         model = glm::rotate(model, rotTaladro.z * toRadians, glm::vec3(0.0f, 0.0f, 1.0f));
         model = glm::rotate(model, taladroRot * toRadians, glm::vec3(0.0f, 1.0f, 0.0f));
         model = glm::scale(model, glm::vec3(-escBigDaddy, escBigDaddy, escBigDaddy));
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
         Material_brillante.UseMaterial(uniformSpecularIntensity, uniformShininess);
-        glCullFace(GL_FRONT); // invertir culling por escala negativa en X
+        glCullFace(GL_FRONT);
         BigDaddyTaladro_M.RenderModel();
         glCullFace(GL_BACK);
 
@@ -1701,6 +2120,7 @@ int main()
         // ============================================
         // RENDER - AVATAR HARRY POTTER: Hermione
         // ============================================
+        glm::mat4 modelaux;
 
         // Hermione: cuerpo completo (padre jerarquico)
         model = glm::mat4(1.0f);
@@ -1711,79 +2131,75 @@ int main()
         Material_opaco.UseMaterial(uniformSpecularIntensity, uniformShininess);
         Hermione_HP_M.RenderModel();
 
-        // Hermione: brazo derecho (animado, offset desde el cuerpo)
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, hpOffsetEscena + glm::vec3(hpPosX, 1.0f, hpPosZ));
-        model = glm::rotate(model, hpRotPersonaje * toRadians, glm::vec3(0.0f, 1.0f, 0.0f));
-        model = glm::translate(model, glm::vec3(0.5f, 0.8f, 0.0f));
-        model = glm::rotate(model, hpRotBrazoDer * toRadians, glm::vec3(1.0f, 0.0f, 0.0f));
-        glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
+        // Hermione: brazo derecho (hijo del cuerpo)
+        modelaux = model;
+        modelaux = glm::translate(modelaux, glm::vec3(0.5f, 0.8f, 0.0f));
+        modelaux = glm::rotate(modelaux, hpRotBrazoDer * toRadians, glm::vec3(1.0f, 0.0f, 0.0f));
+        glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(modelaux));
+        Material_opaco.UseMaterial(uniformSpecularIntensity, uniformShininess);
         BrazoDer_HP_M.RenderModel();
 
-        // Hermione: brazo izquierdo (animado, offset desde el cuerpo)
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, hpOffsetEscena + glm::vec3(hpPosX, 1.0f, hpPosZ));
-        model = glm::rotate(model, hpRotPersonaje * toRadians, glm::vec3(0.0f, 1.0f, 0.0f));
-        model = glm::translate(model, glm::vec3(-0.5f, 0.8f, 0.0f));
-        model = glm::rotate(model, hpRotBrazoIzq * toRadians, glm::vec3(1.0f, 0.0f, 0.0f));
-        glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
+        // Hermione: brazo izquierdo (hijo del cuerpo)
+        modelaux = model;
+        modelaux = glm::translate(modelaux, glm::vec3(-0.5f, 0.8f, 0.0f));
+        modelaux = glm::rotate(modelaux, hpRotBrazoIzq * toRadians, glm::vec3(1.0f, 0.0f, 0.0f));
+        glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(modelaux));
+        Material_opaco.UseMaterial(uniformSpecularIntensity, uniformShininess);
         BrazoIzq_HP_M.RenderModel();
-
-        // Hermione: pierna derecha (animada)
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, hpOffsetEscena + glm::vec3(hpPosX, 1.0f, hpPosZ));
-        model = glm::rotate(model, hpRotPersonaje * toRadians, glm::vec3(0.0f, 1.0f, 0.0f));
-        model = glm::translate(model, glm::vec3(0.1f, -0.7f, 0.0f));
-        model = glm::rotate(model, hpRotPiernaDer * toRadians, glm::vec3(1.0f, 0.0f, 0.0f));
-        glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
+        // Hermione: pierna derecha (hija del cuerpo)
+        modelaux = model;
+        modelaux = glm::translate(modelaux, glm::vec3(0.1f, -0.7f, 0.0f));
+        modelaux = glm::rotate(modelaux, 180.0f * toRadians, glm::vec3(0.0f, 1.0f, 0.0f)); // giro fijo
+        modelaux = glm::rotate(modelaux, hpRotPiernaDer * toRadians, glm::vec3(1.0f, 0.0f, 0.0f)); // animación
+        glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(modelaux));
+        Material_opaco.UseMaterial(uniformSpecularIntensity, uniformShininess);
         PiernaDer_HP_M.RenderModel();
 
-        // Hermione: pierna izquierda (animada)
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, hpOffsetEscena + glm::vec3(hpPosX, 1.0f, hpPosZ));
-        model = glm::rotate(model, hpRotPersonaje * toRadians, glm::vec3(0.0f, 1.0f, 0.0f));
-        model = glm::translate(model, glm::vec3(-0.1f, -0.7f, 0.0f));
-        model = glm::rotate(model, hpRotPiernaIzq * toRadians, glm::vec3(1.0f, 0.0f, 0.0f));
-        glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
+        // Hermione: pierna izquierda (hija del cuerpo)
+        modelaux = model;
+        modelaux = glm::translate(modelaux, glm::vec3(-0.1f, -0.7f, 0.0f));
+        modelaux = glm::rotate(modelaux, 180.0f * toRadians, glm::vec3(0.0f, 1.0f, 0.0f)); // giro fijo
+        modelaux = glm::rotate(modelaux, hpRotPiernaIzq * toRadians, glm::vec3(1.0f, 0.0f, 0.0f)); // animación
+        glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(modelaux));
+        Material_opaco.UseMaterial(uniformSpecularIntensity, uniformShininess);
         PiernaIzq_HP_M.RenderModel();
 
         // ============================================
         // RENDER - OBJETOS HARRY POTTER
         // ============================================
-
-        // Carro volador: padre jerarquico comun para carro + 4 llantas
+// Carro volador: padre jerarquico comun para carro + 4 llantas
         glm::mat4 hpCarroBase = glm::mat4(1.0f);
-        hpCarroBase = glm::translate(hpCarroBase, hpOffsetEscena + glm::vec3(hpCarroPosX, -1.5f, hpCarroPosZ));
+        hpCarroBase = glm::translate(hpCarroBase, hpCarroPos + glm::vec3(0.0f, -2.0f, 0.0f));
         hpCarroBase = glm::rotate(hpCarroBase, hpRotCarro * toRadians, glm::vec3(0.0f, 1.0f, 0.0f));
-        hpCarroBase = glm::scale(hpCarroBase, glm::vec3(1.0f));
+        hpCarroBase = glm::scale(hpCarroBase, glm::vec3(2.0f));
 
-        // Carro: carroceria
+        // Carro carroceria
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(hpCarroBase));
         Material_opaco.UseMaterial(uniformSpecularIntensity, uniformShininess);
         Carro_HP_M.RenderModel();
 
-        // Carro: llanta frontal derecha
+        // Carro llanta frontal derecha
         model = hpCarroBase;
         model = glm::translate(model, glm::vec3(0.52f, -0.01f, 0.456f));
         model = glm::rotate(model, hpRotLlantas * toRadians, glm::vec3(1.0f, 0.0f, 0.0f));
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
         LlantaFD_HP_M.RenderModel();
 
-        // Carro: llanta frontal izquierda
+        // Carro llanta frontal izquierda
         model = hpCarroBase;
         model = glm::translate(model, glm::vec3(-0.52f, -0.01f, 0.465f));
         model = glm::rotate(model, hpRotLlantas * toRadians, glm::vec3(1.0f, 0.0f, 0.0f));
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
         LlantaFI_HP_M.RenderModel();
 
-        // Carro: llanta trasera derecha
+        // Carro llanta trasera derecha
         model = hpCarroBase;
         model = glm::translate(model, glm::vec3(0.52f, -0.01f, -0.465f));
         model = glm::rotate(model, hpRotLlantas * toRadians, glm::vec3(1.0f, 0.0f, 0.0f));
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
         LlantaAD_HP_M.RenderModel();
 
-        // Carro: llanta trasera izquierda
+        // Carro llanta trasera izquierda
         model = hpCarroBase;
         model = glm::translate(model, glm::vec3(-0.52f, -0.01f, -0.465f));
         model = glm::rotate(model, hpRotLlantas * toRadians, glm::vec3(1.0f, 0.0f, 0.0f));
@@ -1814,11 +2230,12 @@ int main()
         Material_brillante.UseMaterial(uniformSpecularIntensity, uniformShininess);
         LibroHechizos_HP_M.RenderModel();
 
-        // Snitch dorada (solo si es visible; animacion de vuelo senoidal)
-        if (hpSnitchVisible) {
+        // Snitch dorada: solo si es visible (animacion de vuelo senoidal)
+        if (hpSnitchVisible)
+        {
             model = glm::mat4(1.0f);
             model = glm::translate(model, hpPosSnitch);
-            model = glm::scale(model, glm::vec3(0.4f));
+            model = glm::scale(model, glm::vec3(2.4f));
             glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
             Material_brillante.UseMaterial(uniformSpecularIntensity, uniformShininess);
             Snitch_HP_M.RenderModel();
@@ -1826,8 +2243,9 @@ int main()
 
         // Copa de los tres magos
         model = glm::mat4(1.0f);
-        model = glm::translate(model, hpPosCopa);
-        model = glm::scale(model, glm::vec3(1.0f));
+        model = glm::translate(model, hpPosCopa + glm::vec3(0.0f, copaOffsetY, 0.0f));
+        model = glm::rotate(model, copaRotY * toRadians, glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(copaEscActual));
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
         Material_brillante.UseMaterial(uniformSpecularIntensity, uniformShininess);
         Copa_HP_M.RenderModel();
@@ -1965,41 +2383,45 @@ int main()
         // RENDER - OBJETOS CRASH
         // ============================================
 
-        // Go-kart: padre jerarquico comun para kart + 4 llantas
+// Go-kart padre jerarquico comun para kart + 4 llantas
         glm::mat4 kartBase = glm::mat4(1.0f);
-        kartBase = glm::translate(kartBase, crashOffsetEscena + glm::vec3(kartPosX, -1.5f, kartPosZ));
-        kartBase = glm::rotate(kartBase, kartRotY * toRadians, glm::vec3(0.0f, 1.0f, 0.0f));
-        kartBase = glm::scale(kartBase, glm::vec3(1.0f));
+        kartBase = glm::translate(kartBase, kartPos + glm::vec3(0.0f, -2.0f, 0.0f));
+        kartBase = glm::rotate(kartBase, (kartRotY - 90.0f) * toRadians, glm::vec3(0.0f, 1.0f, 0.0f));
+        kartBase = glm::scale(kartBase, glm::vec3(2.0f));
 
-        // Kart: carroceria
+        // Kart carroceria
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(kartBase));
         Material_opaco.UseMaterial(uniformSpecularIntensity, uniformShininess);
         Crash_GoKart_M.RenderModel();
 
-        // Kart: llanta frontal derecha
+        // Kart llanta frontal derecha
         model = kartBase;
         model = glm::translate(model, glm::vec3(0.52f, -0.01f, 0.456f));
+        model = glm::rotate(model, -90.0f * toRadians, glm::vec3(0.0f, 1.0f, 0.0f));
         model = glm::rotate(model, kartRotLlantas * toRadians, glm::vec3(1.0f, 0.0f, 0.0f));
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
         LlantaFD_Crash_M.RenderModel();
 
-        // Kart: llanta frontal izquierda
+        // Kart llanta frontal izquierda
         model = kartBase;
         model = glm::translate(model, glm::vec3(-0.52f, -0.01f, 0.456f));
+        model = glm::rotate(model, -90.0f * toRadians, glm::vec3(0.0f, 1.0f, 0.0f));
         model = glm::rotate(model, kartRotLlantas * toRadians, glm::vec3(1.0f, 0.0f, 0.0f));
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
         LlantaFI_Crash_M.RenderModel();
 
-        // Kart: llanta trasera derecha
+        // Kart llanta trasera derecha
         model = kartBase;
         model = glm::translate(model, glm::vec3(0.52f, -0.01f, -0.456f));
+        model = glm::rotate(model, -90.0f * toRadians, glm::vec3(0.0f, 1.0f, 0.0f));
         model = glm::rotate(model, kartRotLlantas * toRadians, glm::vec3(1.0f, 0.0f, 0.0f));
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
         LlantaAD_Crash_M.RenderModel();
 
-        // Kart: llanta trasera izquierda
+        // Kart llanta trasera izquierda
         model = kartBase;
         model = glm::translate(model, glm::vec3(-0.52f, -0.01f, -0.456f));
+        model = glm::rotate(model, -90.0f * toRadians, glm::vec3(0.0f, 1.0f, 0.0f));
         model = glm::rotate(model, kartRotLlantas * toRadians, glm::vec3(1.0f, 0.0f, 0.0f));
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
         LlantaAI_Crash_M.RenderModel();
@@ -2162,7 +2584,7 @@ int main()
 
         model = glm::mat4(1.0f);
         model = glm::translate(model, posPista);
-        model = glm::scale(model, glm::vec3(1.0f));
+        model = glm::scale(model, glm::vec3(3.0f, 1.0f, 4.0f));
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
         Material_opaco.UseMaterial(uniformSpecularIntensity, uniformShininess);
         Pista_M.RenderModel();
