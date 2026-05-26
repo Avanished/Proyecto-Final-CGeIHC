@@ -130,9 +130,9 @@ void Model::LoadMesh(aiMesh* mesh, const aiScene* scene)
 		if (mesh->mNormals)
 		{
 			vertices.insert(vertices.end(), {
-				-mesh->mNormals[i].x,
-				-mesh->mNormals[i].y,
-				-mesh->mNormals[i].z
+				mesh->mNormals[i].x,
+				mesh->mNormals[i].y,
+				mesh->mNormals[i].z
 				});
 		}
 		else

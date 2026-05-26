@@ -1,5 +1,6 @@
 #include "Window.h"
 
+
 Window::Window()
 {
 	width = 800;
@@ -46,7 +47,7 @@ int Window::Initialise()
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
-	mainWindow = glfwCreateWindow(width, height, "Practica 7 Iluminacion", NULL, NULL);
+	mainWindow = glfwCreateWindow(width, height, "Proyecto Final - Abraham - Alexis - Ariadna", NULL, NULL);
 	if (!mainWindow)
 	{
 		printf("Error creating GLFW window!");
@@ -122,25 +123,6 @@ void Window::handleKeys(GLFWwindow* window, int key, int code, int action, int m
 		}
 	}
 
-	// movimiento del coche
-	if (theWindow->keys[GLFW_KEY_T])
-	{
-		theWindow->muevex += 0.5f;
-	}
-	if (theWindow->keys[GLFW_KEY_Y])
-	{
-		theWindow->muevex -= 0.5f;
-	}
-
-	// movimiento del helicoptero
-	if (theWindow->keys[GLFW_KEY_H])
-	{
-		theWindow->muevehelicoptero += 0.5f;
-	}
-	if (theWindow->keys[GLFW_KEY_J])
-	{
-		theWindow->muevehelicoptero -= 0.5f;
-	}
 }
 
 void Window::handleMouse(GLFWwindow* window, double xPos, double yPos)
