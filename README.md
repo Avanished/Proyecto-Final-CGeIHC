@@ -9,13 +9,14 @@ Este repositorio contiene únicamente el código fuente del proyecto y la carpet
 ## No incluido en este repositorio
 - Modelos 3D
 - Texturas
+- Audios
 - Archivos compilados
 - Configuración local del entorno
 
 ## Assets del proyecto
 Los modelos y las texturas se descargan desde este enlace:
 
-[Descargar modelos y texturas](https://drive.google.com/drive/u/2/folders/1NMsd_3235AgwIkVdMTps7zDhCENXGGNe)
+[Descargar modelos, texturas y Sonidos](https://drive.google.com/drive/u/2/folders/1NMsd_3235AgwIkVdMTps7zDhCENXGGNe)
 
 ## Instrucciones
 1. Clonar este repositorio.
